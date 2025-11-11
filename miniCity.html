@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mini City 3D - First Person Explore</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #aee6ff;
+      }
+      canvas {
+        display: block;
+      }
+      #overlay {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        color: white;
+        font-family: sans-serif;
+        background: rgba(0, 0, 0, 0.3);
+        padding: 8px 12px;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="overlay">
+      Mini City - Jelajahi Kota (klik layar untuk mulai)<br />
+      <small>
+        Gunakan <b>W A S D</b> untuk bergerak, <b>mouse</b> untuk melihat
+        sekitar, tekan <b>Shift</b> untuk bergerak cepat
+      </small>
+    </div>
+
+    <!-- Three.js -->
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/loaders/FontLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/geometries/TextGeometry.js"></script>
+
+    <script>
+      let scene, camera, renderer, controls;
+      let moveForward = false,
+        moveBackward = false,
+        moveLeft = false,
+        moveRight = false,
+        sprint = false;
+
+      let velocity = new THREE.Vector3();
+      let direction = new THREE.Vector3();
+      const clock = new THREE.Clock();
+
+      init();
+      animate();
+
+      function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xaee6ff);
+
+        camera = new THREE.PerspectiveCamera(
+          60,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000
+        );
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // Lights
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x88bbff, 0.6);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+        dirLight.position.set(50, 60, -30);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        scene.add(dirLight);
+
+        // Ground
+        const ground = new THREE.Mesh(
+          new THREE.PlaneGeometry(400, 400),
+          new THREE.MeshStandardMaterial({ color: 0xe0dfd5 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Roads
+        const roadWidth = 12;
+        const gridSpacing = 40;
+        function createRoad(w, h, x, z) {
+          const mat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+          const road = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, h), mat);
+          road.position.set(x, 0.025, z);
+          road.receiveShadow = true;
+          scene.add(road);
+        }
+
+        for (let i = -100; i <= 100; i += gridSpacing)
+          createRoad(roadWidth, 300, i, 0);
+        for (let j = -100; j <= 100; j += gridSpacing)
+          createRoad(300, roadWidth, 0, j);
+
+        // Buildings
+        function createBuilding(x, z, w, h, d, color) {
+          const mat = new THREE.MeshStandardMaterial({
+            color: color || 0xd5bda3,
+          });
+          const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+          mesh.position.set(x, h / 2, z);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          scene.add(mesh);
+        }
+
+        for (let i = -80; i <= 80; i += gridSpacing) {
+          createBuilding(i, -60, 14, 10 + Math.random() * 5, 14);
+          createBuilding(i, 60, 14, 10 + Math.random() * 5, 14);
+        }
+
+        // Pohon sejajar kiri-kanan jalan
+        function createTree(x, z) {
+          const trunk = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.3, 0.4, 1.2, 6),
+            new THREE.MeshStandardMaterial({ color: 0x8b5a2b })
+          );
+          trunk.position.set(x, 0.6, z);
+          const crown = new THREE.Mesh(
+            new THREE.IcosahedronGeometry(1.2, 0),
+            new THREE.MeshStandardMaterial({ color: 0x2e8b57 })
+          );
+          crown.position.set(x, 2, z);
+          trunk.castShadow = true;
+          crown.castShadow = true;
+          scene.add(trunk, crown);
+        }
+
+        const offsetFromRoad = 10;
+        const treeSpacing = 15;
+        const maxRange = 100;
+
+        // Area yang tidak boleh ada pohon
+        const noTreeZones = [
+          { xMin: 30, xMax: 55, zMin: -55, zMax: -25 }, // area parkir kanan sekolah
+          { xMin: -20, xMax: 20, zMin: -55, zMax: -25 }, // depan sekolah
+        ];
+
+        function isInNoTreeZone(x, z) {
+          return noTreeZones.some(
+            (zone) =>
+              x >= zone.xMin &&
+              x <= zone.xMax &&
+              z >= zone.zMin &&
+              z <= zone.zMax
+          );
+        }
+
+        // Buat pohon di pinggir jalan, tapi hindari zona larangan
+        for (let i = -100; i <= 100; i += gridSpacing) {
+          for (let z = -maxRange; z <= maxRange; z += treeSpacing) {
+            const leftX = i - roadWidth / 2 - offsetFromRoad;
+            const rightX = i + roadWidth / 2 + offsetFromRoad;
+
+            if (!isInNoTreeZone(leftX, z)) createTree(leftX, z);
+            if (!isInNoTreeZone(rightX, z)) createTree(rightX, z);
+          }
+        }
+
+        // Sekolah
+        const school = new THREE.Mesh(
+          new THREE.BoxGeometry(20, 10, 15),
+          new THREE.MeshStandardMaterial({ color: 0xffc1a1 })
+        );
+        school.position.set(0, 5, -40);
+        school.castShadow = true;
+        scene.add(school);
+
+        // Tulisan "SEKOLAH"
+        const loader = new THREE.FontLoader();
+        loader.load(
+          "https://threejs.org/examples/fonts/helvetiker_regular.typeface.json",
+          function (font) {
+            const textGeometry = new THREE.TextGeometry("School", {
+              font: font,
+              size: 2.0,
+              height: 0.4,
+            });
+            const textMaterial = new THREE.MeshStandardMaterial({
+              color: 0x222222,
+              metalness: 0.3,
+              roughness: 0.4,
+            });
+            const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+            textMesh.position.set(10, 4, -34);
+            textMesh.rotation.y = Math.PI / 2;
+            scene.add(textMesh);
+          }
+        );
+
+        // === Area parkir ===
+        const parking = new THREE.Mesh(
+          new THREE.BoxGeometry(20, 0.05, 20),
+          new THREE.MeshStandardMaterial({ color: 0x808080 })
+        );
+        parking.position.set(40, 0.03, -40);
+        parking.receiveShadow = true;
+        scene.add(parking);
+
+        // Garis parkir putih
+        const lineMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        for (let i = -8; i <= 8; i += 4) {
+          const line = new THREE.Mesh(
+            new THREE.BoxGeometry(0.2, 0.02, 3.5),
+            lineMat
+          );
+          line.position.set(40 + i, 0.05, -32);
+          scene.add(line);
+        }
+
+        // === Rambu Parkir (gambar di atas tiang) ===
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.load("Rambu-Tanda-Parkir-.jpg", function (texture) {
+          const boardMat = new THREE.MeshStandardMaterial({
+            map: texture,
+            side: THREE.DoubleSide,
+          });
+
+          // papan rambu
+          const board = new THREE.Mesh(
+            new THREE.PlaneGeometry(2, 2.5),
+            boardMat
+          );
+          board.castShadow = true;
+          board.receiveShadow = true;
+
+          // tiang rambu
+          const poleHeight = 4.0; // tinggi tiang
+          const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.06, 0.06, poleHeight, 12),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
+          );
+          pole.castShadow = true;
+          pole.receiveShadow = true;
+
+          // posisi
+          pole.position.set(0, poleHeight / 2, 0); // dasar di tanah
+          board.position.set(0, poleHeight + 1.2, 0); // papan di atas tiang, naik sedikit agar seperti “kepala”
+
+          // gabungkan keduanya
+          const sign = new THREE.Group();
+          sign.add(pole, board);
+
+          // tempatkan di tepi area parkir
+          sign.position.set(52, 0, -40);
+          sign.rotation.y = Math.PI / 2;
+
+          scene.add(sign);
+        });
+
+        // Lampu lalu lintas + zebra cross di depan sekolah
+        function createTrafficLight(x, z) {
+          const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.2, 0.2, 5, 8),
+            new THREE.MeshStandardMaterial({ color: 0x444444 })
+          );
+          pole.position.set(x, 2.5, z);
+          const box = new THREE.Mesh(
+            new THREE.BoxGeometry(0.8, 2, 0.5),
+            new THREE.MeshStandardMaterial({ color: 0x222222 })
+          );
+          box.position.set(x, 4.5, z);
+          scene.add(pole, box);
+        }
+
+        createTrafficLight(13, -27);
+        createTrafficLight(27, -27);
+
+        // === Rambu School Zone di dekat zebra cross ===
+        const schoolZoneTexture = new THREE.TextureLoader().load("images.png");
+
+        function createSchoolZoneSign(x, z, rotationY = 0) {
+          const signGroup = new THREE.Group();
+
+          const poleHeight = 3.5;
+          const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.06, 0.06, poleHeight, 12),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
+          );
+          pole.position.set(0, poleHeight / 2, 0);
+          pole.castShadow = true;
+
+          const signBoard = new THREE.Mesh(
+            new THREE.PlaneGeometry(2.5, 2.5),
+            new THREE.MeshStandardMaterial({
+              map: schoolZoneTexture,
+              side: THREE.DoubleSide,
+            })
+          );
+          signBoard.position.set(0, poleHeight + 0.8, 0);
+          signBoard.castShadow = true;
+
+          signGroup.add(pole, signBoard);
+          signGroup.position.set(x, 0, z);
+          signGroup.rotation.y = rotationY;
+
+          scene.add(signGroup);
+        }
+
+        // Rambu di kanan dan kiri zebra cross
+        createSchoolZoneSign(12, -30, Math.PI / 2);
+
+        // Zebra cross
+        for (let i = 13; i <= 27; i += 1.2) {
+          const stripe = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 0.05, 1),
+            new THREE.MeshStandardMaterial({ color: 0xffffff })
+          );
+          stripe.position.set(i, 0.03, -30);
+          scene.add(stripe);
+        }
+
+        // Pointer Lock Controls
+        controls = new THREE.PointerLockControls(camera, document.body);
+        scene.add(controls.getObject());
+        document.body.addEventListener("click", () => controls.lock());
+
+        // Keyboard
+        document.addEventListener("keydown", onKeyDown);
+        document.addEventListener("keyup", onKeyUp);
+
+        window.addEventListener("resize", onWindowResize, false);
+
+        // Posisi awal kamera
+        controls.getObject().position.set(0, 2, 20);
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      function onKeyDown(event) {
+        switch (event.code) {
+          case "KeyW":
+            moveForward = true;
+            break;
+          case "KeyA":
+            moveLeft = true;
+            break;
+          case "KeyS":
+            moveBackward = true;
+            break;
+          case "KeyD":
+            moveRight = true;
+            break;
+          case "ShiftLeft":
+          case "ShiftRight":
+            sprint = true;
+            break;
+        }
+      }
+
+      function onKeyUp(event) {
+        switch (event.code) {
+          case "KeyW":
+            moveForward = false;
+            break;
+          case "KeyA":
+            moveLeft = false;
+            break;
+          case "KeyS":
+            moveBackward = false;
+            break;
+          case "KeyD":
+            moveRight = false;
+            break;
+          case "ShiftLeft":
+          case "ShiftRight":
+            sprint = false;
+            break;
+        }
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = clock.getDelta();
+        velocity.x -= velocity.x * 10.0 * delta;
+        velocity.z -= velocity.z * 10.0 * delta;
+
+        direction.z = Number(moveForward) - Number(moveBackward);
+        direction.x = Number(moveRight) - Number(moveLeft);
+        direction.normalize();
+
+        const speed = sprint ? 120.0 : 50.0;
+
+        if (moveForward || moveBackward)
+          velocity.z -= direction.z * speed * delta;
+        if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+
+        controls.moveRight(-velocity.x * delta);
+        controls.moveForward(-velocity.z * delta);
+
+        controls.getObject().position.y = 2;
+
+        renderer.render(scene, camera);
+      }
+    </script>
+  </body>
+</html>

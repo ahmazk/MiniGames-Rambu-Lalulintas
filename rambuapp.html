@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Rambu 3D - Mini City Realistis</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      #app {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #bfe3ff;
+        position: relative;
+      }
+      canvas {
+        display: block;
+      }
+      .ui {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px 14px;
+        border-radius: 10px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+        font-size: 14px;
+        z-index: 10;
+      }
+      .btn {
+        margin-top: 8px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: none;
+        background: #111827;
+        color: #fff;
+        cursor: pointer;
+      }
+      .infoPanel {
+        position: absolute;
+        right: 12px;
+        top: 12px;
+        background: rgba(0, 0, 0, 0.75);
+        color: #fff;
+        padding: 14px;
+        border-radius: 10px;
+        max-width: 320px;
+        display: none;
+        z-index: 10;
+      }
+      .infoPanel h3 {
+        margin-top: 0;
+      }
+      .footer {
+        position: absolute;
+        bottom: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.9);
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="ui">
+        <strong>Rambu 3D — Mini City Realistis</strong><br />
+        <span>Gunakan mouse untuk melihat, WASD untuk bergerak.</span><br />
+        <button id="helpBtn" class="btn">Petunjuk</button>
+      </div>
+
+      <div id="info" class="infoPanel">
+        <h3 id="infoTitle">Rambu</h3>
+        <div id="infoText">Penjelasan rambu akan muncul di sini.</div>
+        <button id="closeInfo" class="btn">Tutup</button>
+      </div>
+
+      <div class="footer">
+        Jelajahi kota kecil dan pelajari rambu-rambu lalu lintas 🚦
+      </div>
+    </div>
+
+    <!-- Import Three.js (ES Modules) -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
+
+      // ======== Scene, Renderer, Camera ========
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xbfd1e5);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      document.getElementById("app").appendChild(renderer.domElement);
+
+      const camera = new THREE.PerspectiveCamera(
+        70,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.set(0, 2, 10);
+
+      // ======== Lighting ========
+      const ambient = new THREE.AmbientLight(0xffffff, 0.45);
+      scene.add(ambient);
+      const sun = new THREE.DirectionalLight(0xfff0dd, 1.1);
+      sun.position.set(20, 60, 40);
+      sun.castShadow = true;
+      sun.shadow.mapSize.width = 2048;
+      sun.shadow.mapSize.height = 2048;
+      scene.add(sun);
+
+      // ======== Ground & Roads ========
+      const loader = new THREE.TextureLoader();
+      const groundTex = loader.load(
+        "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r148/examples/textures/terrain/grasslight-big.jpg"
+      );
+      groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+      groundTex.repeat.set(100, 100);
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(500, 500),
+        new THREE.MeshStandardMaterial({ map: groundTex })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      const asphaltTex = loader.load(
+        "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r148/examples/textures/terrain/road.jpg"
+      );
+      asphaltTex.wrapS = asphaltTex.wrapT = THREE.RepeatWrapping;
+      asphaltTex.repeat.set(10, 1);
+      function createRoad(w, l, x, z, rot = 0) {
+        const mesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(w, l),
+          new THREE.MeshStandardMaterial({ map: asphaltTex })
+        );
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(x, 0.02, z);
+        mesh.rotation.z = rot;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        return mesh;
+      }
+      createRoad(12, 300, 0, 0);
+      createRoad(12, 200, -80, 0, Math.PI / 2);
+
+      // ======== Buildings ========
+      function createBuilding(x, z, w, h, d, color = 0xbcd4e6) {
+        const mat = new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.6,
+          metalness: 0.2,
+        });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+        mesh.position.set(x, h / 2, z);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        return mesh;
+      }
+      for (let i = 0; i < 6; i++) {
+        createBuilding(-40 + i * 15, -10, 8, 10 + Math.random() * 5, 8);
+      }
+
+      // ======== Trees ========
+      function createTree(x, z) {
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.2, 0.3, 1.2),
+          new THREE.MeshStandardMaterial({ color: 0x8b5a2b })
+        );
+        trunk.position.set(x, 0.6, z);
+        const crown = new THREE.Mesh(
+          new THREE.SphereGeometry(1.2, 12, 12),
+          new THREE.MeshStandardMaterial({ color: 0x228b22 })
+        );
+        crown.position.set(x, 2, z);
+        trunk.castShadow = true;
+        crown.castShadow = true;
+        scene.add(trunk, crown);
+      }
+      for (let i = 0; i < 20; i++) {
+        createTree(Math.random() * 100 - 50, Math.random() * 100 - 50);
+      }
+
+      // ======== Rambu (Simple Text Boards) ========
+      const signs = [];
+      function makeSign(title, subtitle) {
+        const size = 512;
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, size, size);
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 20;
+        ctx.strokeRect(10, 10, size - 20, size - 20);
+        ctx.fillStyle = "#111";
+        ctx.textAlign = "center";
+        ctx.font = "bold 72px sans-serif";
+        ctx.fillText(title, size / 2, 200);
+        ctx.font = "48px sans-serif";
+        ctx.fillText(subtitle, size / 2, 300);
+        return new THREE.CanvasTexture(canvas);
+      }
+
+      function createSign(pos, title, subtitle, desc) {
+        const tex = makeSign(title, subtitle);
+        const board = new THREE.Mesh(
+          new THREE.PlaneGeometry(2, 2),
+          new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide })
+        );
+        board.position.set(0, 1.1, 0);
+        const pole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.05, 0.05, 2.2),
+          new THREE.MeshStandardMaterial({ color: 0x333333 })
+        );
+        pole.position.set(0, 1.1, 0);
+        const group = new THREE.Group();
+        group.add(board, pole);
+        group.position.copy(pos);
+        group.userData = { title, desc };
+        scene.add(group);
+        signs.push(group);
+      }
+
+      createSign(
+        new THREE.Vector3(-2, 0, -14),
+        "STOP",
+        "BERHENTI",
+        "Rambu wajib berhenti total."
+      );
+      createSign(
+        new THREE.Vector3(4, 0, -20),
+        "DILARANG",
+        "MASUK",
+        "Rambu larangan masuk kendaraan bermotor."
+      );
+      createSign(
+        new THREE.Vector3(-5, 0, -30),
+        "30",
+        "KM/J",
+        "Batas kecepatan maksimum area ini."
+      );
+
+      // ======== Sky ========
+      const skyGeo = new THREE.SphereGeometry(400, 32, 32);
+      const skyMat = new THREE.MeshBasicMaterial({
+        color: 0x87ceeb,
+        side: THREE.BackSide,
+      });
+      const sky = new THREE.Mesh(skyGeo, skyMat);
+      scene.add(sky);
+
+      // ======== Controls ========
+      const controls = new PointerLockControls(camera, renderer.domElement);
+      renderer.domElement.addEventListener("click", () => {
+        if (!document.pointerLockElement) controls.lock();
+      });
+
+      const move = { f: false, b: false, l: false, r: false };
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "w" || e.key === "ArrowUp") move.f = true;
+        if (e.key === "s" || e.key === "ArrowDown") move.b = true;
+        if (e.key === "a" || e.key === "ArrowLeft") move.l = true;
+        if (e.key === "d" || e.key === "ArrowRight") move.r = true;
+      });
+      window.addEventListener("keyup", (e) => {
+        if (e.key === "w" || e.key === "ArrowUp") move.f = false;
+        if (e.key === "s" || e.key === "ArrowDown") move.b = false;
+        if (e.key === "a" || e.key === "ArrowLeft") move.l = false;
+        if (e.key === "d" || e.key === "ArrowRight") move.r = false;
+      });
+
+      // ======== Info Panel ========
+      const infoBox = document.getElementById("info");
+      const infoTitle = document.getElementById("infoTitle");
+      const infoText = document.getElementById("infoText");
+      document.getElementById("closeInfo").addEventListener("click", () => {
+        infoBox.style.display = "none";
+      });
+
+      const raycaster = new THREE.Raycaster();
+      window.addEventListener("click", () => {
+        const mouse = new THREE.Vector2(0, 0);
+        raycaster.setFromCamera(mouse, camera);
+        const hit = raycaster.intersectObjects(scene.children, true);
+        for (const obj of hit) {
+          if (obj.object.parent && obj.object.parent.userData.desc) {
+            infoTitle.textContent = obj.object.parent.userData.title;
+            infoText.textContent = obj.object.parent.userData.desc;
+            infoBox.style.display = "block";
+            break;
+          }
+        }
+      });
+
+      // ======== Animate ========
+      const clock = new THREE.Clock();
+      function animate() {
+        const dt = clock.getDelta();
+        const speed = 3.0;
+        if (controls.isLocked) {
+          const forward = new THREE.Vector3();
+          controls.getDirection(forward);
+          forward.y = 0;
+          forward.normalize();
+          const right = new THREE.Vector3();
+          right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+          if (move.f) camera.position.addScaledVector(forward, speed * dt);
+          if (move.b) camera.position.addScaledVector(forward, -speed * dt);
+          if (move.l) camera.position.addScaledVector(right, -speed * dt);
+          if (move.r) camera.position.addScaledVector(right, speed * dt);
+        }
+
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+      }
+      animate();
+
+      // ======== Resize ========
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // ======== Help ========
+      document.getElementById("helpBtn").addEventListener("click", () => {
+        alert(`Kontrol:
+- Klik area 3D untuk mengaktifkan mouse (Pointer Lock)
+- Gunakan WASD untuk bergerak
+- Klik rambu untuk melihat informasi`);
+      });
+    </script>
+  </body>
+</html>
+5
