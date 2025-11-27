@@ -2,12 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Mini City 3D (High Poly Version)</title>
+    <title>Mini City 3D - First Person Explore</title>
     <style>
       body {
         margin: 0;
         overflow: hidden;
         background: #aee6ff;
+      }
+      canvas {
+        display: block;
       }
       #overlay {
         position: absolute;
@@ -19,35 +22,235 @@
         padding: 8px 12px;
         border-radius: 8px;
       }
+
+      /* popup styles */
+      #popupOverlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(4px);
+        z-index: 9998;
+      }
+      #signPopup {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 75vw;
+        max-width: 900px;
+        background: rgba(255, 255, 255, 0.65);
+        backdrop-filter: blur(12px);
+        border-radius: 25px;
+        padding: 30px;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.35);
+        font-family: sans-serif;
+        z-index: 9999;
+        display: flex;
+        gap: 25px;
+        align-items: center;
+      }
+      #signPopup img {
+        width: 80%;
+        max-width: 240px;
+        border-radius: 15px;
+        display: block;
+      }
+      #signPopup .right {
+        flex: 1.5;
+      }
+      #signPopup h2 {
+        margin-top: 0;
+        font-size: 28px;
+        margin-bottom: 10px;
+      }
+      #signPopup p {
+        font-size: 18px;
+        line-height: 1.4;
+        margin-bottom: 20px;
+      }
+      #signPopup .btn {
+        margin-top: 10px;
+        width: 100%;
+        padding: 14px;
+        border: none;
+        border-radius: 10px;
+        font-size: 18px;
+        cursor: pointer;
+      }
+      #startQuizBtn {
+        background: #007bff;
+        color: white;
+      }
+      #finishQuizBtn {
+        background: green;
+        color: white;
+      }
+
+      /* quiz radios */
+      #signPopup label {
+        cursor: pointer;
+        display: block;
+        margin: 6px 0;
+      }
+      #signPopup input[type="radio"] {
+        margin-right: 6px;
+      }
     </style>
   </head>
+
   <body>
     <div id="overlay">
-      🏙️ Mini City (High Poly Mode)<br />
+      Mini City - Jelajahi Kota (klik layar untuk mulai)<br />
       <small
-        >Gunakan <b>W A S D</b> untuk bergerak • Klik layar untuk mengunci
-        mouse</small
+        >Gunakan <b>W A S D</b> untuk bergerak, <b>mouse</b> untuk melihat,
+        tekan <b>Shift</b> untuk sprint</small
       >
     </div>
 
-    <!-- === THREE.JS LIBRARIES === -->
-    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r150/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r150/examples/js/controls/PointerLockControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r150/examples/js/loaders/FontLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r150/examples/js/geometries/TextGeometry.js"></script>
+    <!-- overlay + popup -->
+    <div id="popupOverlay"></div>
+
+    <div id="signPopup" role="dialog" aria-modal="true">
+      <button
+        id="closePopup"
+        style="
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          background: transparent;
+          border: none;
+          font-size: 28px;
+          cursor: pointer;
+        "
+      >
+        &times;
+      </button>
+
+      <div
+        style="
+          flex: 1;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        "
+      >
+        <!-- default image path from container as requested -->
+        <img
+          id="popupImage"
+          src="/mnt/data/Corona-response-pop-up-veriheal.jpg"
+          alt="Rambu"
+        />
+      </div>
+
+      <div class="right">
+        <h2 id="popupTitle">Judul</h2>
+        <p id="popupDesc">Deskripsi</p>
+
+        <button
+          id="startQuiz"
+          class="btn"
+          style="background: #007bff; color: white"
+        >
+          Mulai Kuis
+        </button>
+
+        <div id="quizArea" style="display: none; margin-top: 20px"></div>
+      </div>
+    </div>
+
+    <!-- Three.js libs -->
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/loaders/FontLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/geometries/TextGeometry.js"></script>
 
     <script>
+      // ========== Globals ==========
+      let raycaster = new THREE.Raycaster();
+      let clickableSigns = [];
+
       let scene, camera, renderer, controls;
       let moveForward = false,
         moveBackward = false,
         moveLeft = false,
         moveRight = false,
         sprint = false;
-
+      let velocity = new THREE.Vector3(),
+        direction = new THREE.Vector3();
       const clock = new THREE.Clock();
-      const velocity = new THREE.Vector3();
-      const direction = new THREE.Vector3();
+      let trafficLights = [];
 
+      let currentSignId = null;
+
+      // quiz data
+      const quizData = {
+        parking: [
+          {
+            q: "Apa arti rambu P?",
+            a: ["Dilarang parkir", "Area parkir", "Dilarang stop"],
+            c: 1,
+          },
+          {
+            q: "Rambu ini biasanya ditemukan di…",
+            a: ["Jalan utama", "Area pemberhentian kendaraan", "Zona cepat"],
+            c: 1,
+          },
+          {
+            q: "Apa yang tidak boleh dilakukan di area parkir?",
+            a: ["Memarkir kendaraan", "Membuang sampah", "Berhenti sebentar"],
+            c: 1,
+          },
+          {
+            q: "Siapa yang wajib mematuhi rambu ini?",
+            a: ["Hanya pejalan kaki", "Semua pengendara", "Bus saja"],
+            c: 1,
+          },
+          {
+            q: "Bentuk rambu parkir adalah…",
+            a: [
+              "Lingkaran biru dengan huruf P",
+              "Segitiga merah",
+              "Kotak kuning",
+            ],
+            c: 0,
+          },
+        ],
+        schoolzone: [
+          {
+            q: "Apa fungsi rambu school zone?",
+            a: [
+              "Mempercepat kendaraan",
+              "Area bermain",
+              "Peringatan area sekolah",
+            ],
+            c: 2,
+          },
+          {
+            q: "Apa yang harus dilakukan pengendara?",
+            a: ["Memperlambat laju", "Mempercepat", "Membunyikan klakson"],
+            c: 0,
+          },
+          {
+            q: "Siapa yang sering melintas di area ini?",
+            a: ["Guru", "Siswa", "Petugas polisi"],
+            c: 1,
+          },
+          {
+            q: "Kapan rambu ini berlaku?",
+            a: ["Saat malam saja", "Saat jam sekolah", "Tidak pernah"],
+            c: 1,
+          },
+          {
+            q: "Bentuk umum rambu ini adalah…",
+            a: ["Gambar orang menyeberang", "Segitiga kuning", "Kotak hijau"],
+            c: 0,
+          },
+        ],
+      };
+
+      // ========== Init / Scene ==========
       init();
       animate();
 
@@ -55,202 +258,551 @@
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0xaee6ff);
 
-        // === CAMERA ===
         camera = new THREE.PerspectiveCamera(
-          70,
+          60,
           window.innerWidth / window.innerHeight,
           0.1,
-          2000
+          1000
         );
 
-        // === RENDERER ===
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
 
-        // === LIGHTS ===
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x666688, 0.9);
-        scene.add(hemiLight);
+        // register click for pointer lock (first click) - keep simple
+        document.body.addEventListener("click", () => {
+          if (!controls.isLocked) controls.lock();
+        });
 
-        const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
-        sunLight.position.set(100, 150, -100);
-        sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 4096;
-        sunLight.shadow.mapSize.height = 4096;
-        sunLight.shadow.camera.near = 1;
-        sunLight.shadow.camera.far = 500;
-        sunLight.shadow.camera.left = -200;
-        sunLight.shadow.camera.right = 200;
-        sunLight.shadow.camera.top = 200;
-        sunLight.shadow.camera.bottom = -200;
-        scene.add(sunLight);
+        // register click for interactions (this handler WILL check isLocked)
+        document.addEventListener("click", handleSceneClick, false);
 
-        // === GROUND ===
+        // lights
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x88bbff, 0.6);
+        scene.add(hemi);
+        const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+        dir.position.set(50, 60, -30);
+        dir.castShadow = true;
+        dir.shadow.mapSize.width = dir.shadow.mapSize.height = 2048;
+        scene.add(dir);
+
+        // ground
         const ground = new THREE.Mesh(
-          new THREE.PlaneGeometry(400, 400, 64, 64),
-          new THREE.MeshPhysicalMaterial({
-            color: 0xe0dfd5,
-            roughness: 0.8,
-            metalness: 0.1,
-          })
+          new THREE.PlaneGeometry(400, 400),
+          new THREE.MeshStandardMaterial({ color: 0xe0dfd5 })
         );
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // === ROADS ===
-        const roadMat = new THREE.MeshPhysicalMaterial({
-          color: 0x2f2f2f,
-          roughness: 0.5,
-          metalness: 0.3,
-        });
-        const roadWidth = 12;
-        const gridSpacing = 40;
-
+        // roads (same as before)
+        const roadWidth = 12,
+          gridSpacing = 40;
         function createRoad(w, h, x, z) {
-          const road = new THREE.Mesh(
-            new THREE.BoxGeometry(w, 0.05, h, 8, 1, 8),
-            roadMat
-          );
+          const mat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+          const road = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, h), mat);
           road.position.set(x, 0.025, z);
           road.receiveShadow = true;
           scene.add(road);
         }
-
         for (let i = -100; i <= 100; i += gridSpacing)
           createRoad(roadWidth, 300, i, 0);
         for (let j = -100; j <= 100; j += gridSpacing)
           createRoad(300, roadWidth, 0, j);
 
-        // === BUILDINGS ===
+        // buildings / trees / other content (same logic as your code)
         function createBuilding(x, z, w, h, d, color) {
-          const mat = new THREE.MeshPhysicalMaterial({
-            color: color || 0xbcbcbc,
-            roughness: 0.5,
-            metalness: 0.2,
-            clearcoat: 0.4,
+          const mat = new THREE.MeshStandardMaterial({
+            color: color || 0xd5bda3,
           });
-          const geo = new THREE.BoxGeometry(w, h, d, 6, 6, 6);
-          const building = new THREE.Mesh(geo, mat);
-          building.position.set(x, h / 2, z);
-          building.castShadow = true;
-          building.receiveShadow = true;
-          scene.add(building);
+          const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+          mesh.position.set(x, h / 2, z);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          scene.add(mesh);
         }
-
+        const buildingOffset = 15,
+          buildingWidth = 14;
         for (let i = -80; i <= 80; i += gridSpacing) {
-          createBuilding(i, -60, 14, 15 + Math.random() * 10, 14);
-          createBuilding(i, 60, 14, 15 + Math.random() * 10, 14);
+          if (i !== 0) {
+            createBuilding(
+              i,
+              -60 - buildingOffset,
+              buildingWidth,
+              10 + Math.random() * 5,
+              buildingWidth
+            );
+            createBuilding(
+              i,
+              60 + buildingOffset,
+              buildingWidth,
+              10 + Math.random() * 5,
+              buildingWidth
+            );
+          }
         }
 
-        // === TREES (smooth high-poly) ===
         function createTree(x, z) {
           const trunk = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.4, 0.5, 2, 16),
-            new THREE.MeshPhysicalMaterial({ color: 0x8b5a2b })
+            new THREE.CylinderGeometry(0.3, 0.4, 1.2, 6),
+            new THREE.MeshStandardMaterial({ color: 0x8b5a2b })
           );
-          trunk.position.set(x, 1, z);
-          const leaves = new THREE.Mesh(
-            new THREE.SphereGeometry(1.5, 24, 24),
-            new THREE.MeshPhysicalMaterial({
-              color: 0x228b22,
-              roughness: 0.8,
-              metalness: 0.2,
-            })
+          trunk.position.set(x, 0.6, z);
+          const crown = new THREE.Mesh(
+            new THREE.IcosahedronGeometry(1.2, 0),
+            new THREE.MeshStandardMaterial({ color: 0x2e8b57 })
           );
-          leaves.position.set(x, 3, z);
+          crown.position.set(x, 2, z);
           trunk.castShadow = true;
-          leaves.castShadow = true;
-          scene.add(trunk, leaves);
+          crown.castShadow = true;
+          scene.add(trunk, crown);
+        }
+        const offsetFromRoad = 12,
+          treeSpacing = 15,
+          maxRange = 100;
+        const noTreeZones = [
+          { xMin: 30, xMax: 55, zMin: -55, zMax: -25 },
+          { xMin: -20, xMax: 20, zMin: -55, zMax: -25 },
+        ];
+        function isInNoTreeZone(x, z) {
+          return noTreeZones.some(
+            (zone) =>
+              x >= zone.xMin &&
+              x <= zone.xMax &&
+              z >= zone.zMin &&
+              z <= zone.zMax
+          );
+        }
+        function isTooCloseToRoad(x, z) {
+          if (Math.abs(z) < roadWidth / 2 + 2) return true;
+          if (Math.abs(x) < roadWidth / 2 + 2) return true;
+          for (let i = -100; i <= 100; i += gridSpacing) {
+            if (Math.abs(x - i) < roadWidth / 2 + 2 && Math.abs(z) < 150)
+              return true;
+            if (Math.abs(z - i) < roadWidth / 2 + 2 && Math.abs(x) < 150)
+              return true;
+          }
+          return false;
+        }
+        for (let i = -100; i <= 100; i += gridSpacing) {
+          for (let z = -maxRange; z <= maxRange; z += treeSpacing) {
+            const leftX = i - roadWidth / 2 - offsetFromRoad;
+            const rightX = i + roadWidth / 2 + offsetFromRoad;
+            if (!isInNoTreeZone(leftX, z) && !isTooCloseToRoad(leftX, z))
+              createTree(leftX, z);
+            if (!isInNoTreeZone(rightX, z) && !isTooCloseToRoad(rightX, z))
+              createTree(rightX, z);
+          }
         }
 
-        for (let z = -100; z <= 100; z += 12) {
-          createTree(-20, z);
-          createTree(20, z);
-        }
-
-        // === SCHOOL ===
+        // school building + sign text
         const school = new THREE.Mesh(
-          new THREE.BoxGeometry(20, 12, 15, 8, 8, 8),
-          new THREE.MeshPhysicalMaterial({
-            color: 0xffc1a1,
-            roughness: 0.4,
-            clearcoat: 0.3,
-          })
+          new THREE.BoxGeometry(20, 10, 15),
+          new THREE.MeshStandardMaterial({ color: 0xffc1a1 })
         );
-        school.position.set(0, 6, -40);
+        school.position.set(0, 5, -40);
         school.castShadow = true;
         scene.add(school);
-
-        // === SCHOOL LABEL ===
-        const loader = new THREE.FontLoader();
-        loader.load(
+        const fontLoader = new THREE.FontLoader();
+        fontLoader.load(
           "https://threejs.org/examples/fonts/helvetiker_regular.typeface.json",
-          (font) => {
-            const geo = new THREE.TextGeometry("School", {
+          function (font) {
+            const t = new THREE.TextGeometry("School", {
               font,
-              size: 2,
+              size: 2.0,
               height: 0.4,
             });
-            const mat = new THREE.MeshPhysicalMaterial({ color: 0x222222 });
-            const text = new THREE.Mesh(geo, mat);
-            text.position.set(10, 5, -34);
-            text.rotation.y = Math.PI / 2;
-            text.castShadow = true;
-            scene.add(text);
+            const m = new THREE.MeshStandardMaterial({
+              color: 0x222222,
+              metalness: 0.3,
+              roughness: 0.4,
+            });
+            const mesh = new THREE.Mesh(t, m);
+            mesh.position.set(10, 4, -34);
+            mesh.rotation.y = Math.PI / 2;
+            scene.add(mesh);
           }
         );
 
-        // === SCHOOL ZONE SIGN ===
-        const textureLoader = new THREE.TextureLoader();
-        textureLoader.load("images.png", (texture) => {
-          const pole = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.08, 0.08, 4, 16),
-            new THREE.MeshPhysicalMaterial({ color: 0x333333 })
+        // parking area and lines
+        const parking = new THREE.Mesh(
+          new THREE.BoxGeometry(20, 0.05, 20),
+          new THREE.MeshStandardMaterial({ color: 0x808080 })
+        );
+        parking.position.set(40, 0.03, -40);
+        parking.receiveShadow = true;
+        scene.add(parking);
+        for (let i = -8; i <= 8; i += 4) {
+          const line = new THREE.Mesh(
+            new THREE.BoxGeometry(0.2, 0.02, 3.5),
+            new THREE.MeshStandardMaterial({ color: 0xffffff })
           );
-          const board = new THREE.Mesh(
-            new THREE.PlaneGeometry(2.5, 2.5),
-            new THREE.MeshPhysicalMaterial({
+          line.position.set(40 + i, 0.05, -32);
+          scene.add(line);
+        }
+
+        // parking sign (with texture fallback)
+        const loader = new THREE.TextureLoader();
+        loader.load(
+          "Rambu-Tanda-Parkir-.jpg",
+          (texture) => {
+            const boardMat = new THREE.MeshStandardMaterial({
               map: texture,
-              roughness: 0.4,
-              metalness: 0.1,
               side: THREE.DoubleSide,
-            })
+            });
+            const board = new THREE.Mesh(
+              new THREE.PlaneGeometry(2, 2.5),
+              boardMat
+            );
+            board.castShadow = true;
+            board.receiveShadow = true;
+            const pole = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.06, 0.06, 4, 12),
+              new THREE.MeshStandardMaterial({ color: 0x333333 })
+            );
+            pole.position.set(0, 2, 0);
+            board.position.set(0, 3.2, 0);
+            const sign = new THREE.Group();
+            sign.add(pole, board);
+            sign.position.set(52, 0, -40);
+            sign.rotation.y = Math.PI / 2;
+            scene.add(sign);
+            clickableSigns.push({ mesh: sign, id: "parking" });
+          },
+          undefined,
+          (err) => {
+            console.error("texture load err", err);
+            createSimpleParkingSign(52, 0, -40, Math.PI / 2);
+          }
+        );
+
+        function createSimpleParkingSign(x, y, z, rotationY) {
+          const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.06, 0.06, 4, 12),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
           );
           pole.position.set(0, 2, 0);
-          board.position.set(0, 4.5, 0);
-          const group = new THREE.Group();
-          group.add(pole, board);
-          group.position.set(27, 0, -30);
-          group.rotation.y = -Math.PI / 2;
-          scene.add(group);
-        });
+          const board = new THREE.Mesh(
+            new THREE.BoxGeometry(1.5, 2, 0.1),
+            new THREE.MeshStandardMaterial({ color: 0x2e8b57 })
+          );
+          board.position.set(0, 4.2, 0); // FIXED -> 4.2 (previously 42)
+          const signGroup = new THREE.Group();
+          signGroup.add(pole, board);
+          signGroup.position.set(x, y, z);
+          signGroup.rotation.y = rotationY;
+          scene.add(signGroup);
+          clickableSigns.push({ mesh: signGroup, id: "parking" });
+        }
 
-        // === ZEBRA CROSS ===
-        const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        // traffic lights back-only (kept)
+        function createTrafficLight(x, z) {
+          const group = new THREE.Group();
+          const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.2, 0.2, 5, 8),
+            new THREE.MeshStandardMaterial({ color: 0x444444 })
+          );
+          pole.position.set(0, 2.5, 0);
+          group.add(pole);
+          const box = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 3, 0.8),
+            new THREE.MeshStandardMaterial({ color: 0x222222 })
+          );
+          box.position.set(0, 4.5, 0);
+          group.add(box);
+          const lightGeo = new THREE.SphereGeometry(0.25, 12, 12);
+          const red = new THREE.Mesh(
+            lightGeo,
+            new THREE.MeshStandardMaterial({
+              color: 0x330000,
+              emissive: 0x000000,
+            })
+          );
+          red.position.set(0, 5.6, -0.45);
+          const yellow = new THREE.Mesh(
+            lightGeo,
+            new THREE.MeshStandardMaterial({
+              color: 0x332200,
+              emissive: 0x000000,
+            })
+          );
+          yellow.position.set(0, 4.5, -0.45);
+          const green = new THREE.Mesh(
+            lightGeo,
+            new THREE.MeshStandardMaterial({
+              color: 0x003300,
+              emissive: 0x000000,
+            })
+          );
+          green.position.set(0, 3.4, -0.45);
+          group.add(red, yellow, green);
+          trafficLights.push({ red, yellow, green, timer: 0, state: 0 });
+          group.position.set(x, 0, z);
+          scene.add(group);
+        }
+        createTrafficLight(13, -27);
+        createTrafficLight(27, -27);
+
+        // school zone sign (texture or fallback)
+        const schoolTex = new THREE.TextureLoader();
+        schoolTex.load(
+          "images.png",
+          (texture) => {
+            function createSchoolZoneSign(x, z, rotationY = 0) {
+              const signGroup = new THREE.Group();
+              const poleHeight = 3.5;
+              const pole = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.06, 0.06, poleHeight, 12),
+                new THREE.MeshStandardMaterial({ color: 0x333333 })
+              );
+              pole.position.set(0, poleHeight / 2, 0);
+              pole.castShadow = true;
+              const signBoard = new THREE.Mesh(
+                new THREE.PlaneGeometry(2.5, 2.5),
+                new THREE.MeshStandardMaterial({
+                  map: texture,
+                  side: THREE.DoubleSide,
+                })
+              );
+              signBoard.position.set(0, poleHeight + 0.8, 0);
+              signBoard.castShadow = true;
+              signGroup.add(pole, signBoard);
+              signGroup.position.set(x, 0, z);
+              signGroup.rotation.y = rotationY;
+              scene.add(signGroup);
+              clickableSigns.push({ mesh: signGroup, id: "schoolzone" });
+            }
+            createSchoolZoneSign(12, -30, Math.PI / 2);
+          },
+          undefined,
+          (err) => {
+            console.error("school texture err", err);
+            createSimpleSchoolZoneSign(12, 0, -30, Math.PI / 2);
+          }
+        );
+        function createSimpleSchoolZoneSign(x, y, z, rotationY) {
+          const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.06, 0.06, 3.5, 12),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
+          );
+          pole.position.set(0, 1.75, 0);
+          const board = new THREE.Mesh(
+            new THREE.BoxGeometry(2, 2, 0.1),
+            new THREE.MeshStandardMaterial({ color: 0xffd700 })
+          );
+          board.position.set(0, 3.55, 0);
+          const signGroup = new THREE.Group();
+          signGroup.add(pole, board);
+          signGroup.position.set(x, y, z);
+          signGroup.rotation.y = rotationY;
+          scene.add(signGroup);
+          clickableSigns.push({ mesh: signGroup, id: "schoolzone" });
+        }
+
+        // zebra cross
         for (let i = 13; i <= 27; i += 1.2) {
           const stripe = new THREE.Mesh(
             new THREE.BoxGeometry(1, 0.05, 1),
-            stripeMat
+            new THREE.MeshStandardMaterial({ color: 0xffffff })
           );
           stripe.position.set(i, 0.03, -30);
           scene.add(stripe);
         }
 
-        // === CONTROLS ===
+        // pointer lock controls
         controls = new THREE.PointerLockControls(camera, document.body);
         scene.add(controls.getObject());
-        document.body.addEventListener("click", () => controls.lock());
 
-        // === EVENTS ===
+        // keyboard listeners
         document.addEventListener("keydown", onKeyDown);
         document.addEventListener("keyup", onKeyUp);
         window.addEventListener("resize", onWindowResize);
 
-        // Initial camera
         controls.getObject().position.set(0, 2, 20);
+
+        // popup buttons hookup
+        document.getElementById("closePopup").addEventListener("click", () => {
+          hidePopup();
+        });
+        document.getElementById("startQuiz").addEventListener("click", () => {
+          if (currentSignId) startQuiz(currentSignId);
+        });
+      }
+
+      // ========== Interaction handlers ==========
+      function handleSceneClick(event) {
+        // only allow interaction when pointer locked (player is "playing")
+        if (!controls || !controls.isLocked) return;
+
+        // raycast from center of screen
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        const intersects = raycaster.intersectObjects(
+          clickableSigns.map((s) => s.mesh),
+          true
+        );
+        if (intersects.length === 0) return;
+
+        // find the clickable sign by walking parents
+        const intersectObj = intersects[0].object;
+        const found = findClickableSignFromObject(intersectObj);
+        if (!found) return;
+
+        // distance check (to group's position)
+        const dist = camera.position.distanceTo(
+          found.mesh.position || new THREE.Vector3()
+        );
+        if (dist < 10) {
+          openSignPopup(found.id);
+        } else {
+          // optional: give small feedback instead (not implemented)
+        }
+      }
+
+      function findClickableSignFromObject(obj) {
+        let o = obj;
+        while (o) {
+          const found = clickableSigns.find((s) => s.mesh === o);
+          if (found) return found;
+          o = o.parent;
+        }
+        return null;
+      }
+
+      // ========== Popup control ==========
+      function openSignPopup(id) {
+        currentSignId = id;
+        const popup = document.getElementById("signPopup");
+        const overlay = document.getElementById("popupOverlay");
+        const title = document.getElementById("popupTitle");
+        const desc = document.getElementById("popupDesc");
+        const img = document.getElementById("popupImage");
+
+        // set content per id
+        if (id === "parking") {
+          title.innerText = "Rambu Parkir (P)";
+          desc.innerText =
+            "Rambu ini menandakan area yang diperbolehkan untuk parkir kendaraan. Pengendara boleh berhenti dan memarkirkan kendaraannya di area ini.";
+          img.src = "/mnt/data/Corona-response-pop-up-veriheal.jpg";
+        } else if (id === "schoolzone") {
+          title.innerText = "Rambu School Zone";
+          desc.innerText =
+            "Rambu ini menandakan bahwa Anda memasuki area sekolah. Pengendara wajib memperlambat kendaraan dan lebih waspada terhadap siswa yang melintas.";
+          img.src = "/mnt/data/59863e0e-fbd0-4775-bdae-786d0798db0e.png";
+        } else {
+          title.innerText = "Rambu";
+          desc.innerText = "Informasi rambu tidak tersedia.";
+          img.src = "/mnt/data/Corona-response-pop-up-veriheal.jpg";
+        }
+
+        // show overlay + popup; unlock pointer so user can use mouse & buttons
+        overlay.style.display = "block";
+        popup.style.display = "flex";
+        controls.unlock();
+      }
+
+      function hidePopup() {
+        const popup = document.getElementById("signPopup");
+        const overlay = document.getElementById("popupOverlay");
+        const quizArea = document.getElementById("quizArea");
+
+        popup.style.display = "none";
+        overlay.style.display = "none";
+        quizArea.style.display = "none";
+
+        // return to pointer-locked play mode
+        // re-lock the pointer so user can continue playing
+        controls.lock();
+      }
+
+      // ========== Quiz logic (now replaces info view) ==========
+      function startQuiz(id) {
+        // When starting quiz we replace the right column content with quiz
+        const title = document.getElementById("popupTitle");
+        const desc = document.getElementById("popupDesc");
+        const img = document.getElementById("popupImage");
+        const startBtn = document.getElementById("startQuiz");
+        const quizArea = document.getElementById("quizArea");
+
+        if (!quizData[id]) return;
+
+        // hide info view elements (image + desc + start button)
+        img.style.display = "none";
+        desc.style.display = "none";
+        startBtn.style.display = "none";
+
+        // build quiz html inside quizArea
+        quizArea.style.display = "block";
+        let html = "";
+        quizData[id].forEach((item, index) => {
+          html += `<div style="margin-bottom:12px;">
+            <b>${index + 1}. ${item.q}</b>
+            ${item.a
+              .map(
+                (opt, i) =>
+                  `<label><input type="radio" name="q${index}" value="${i}"> ${opt}</label>`
+              )
+              .join("")}
+          </div>`;
+        });
+        html += `<button id="finishQuizBtn" class="btn" style="background:green; color:white;">Selesai Kuis</button>`;
+        quizArea.innerHTML = html;
+
+        document
+          .getElementById("finishQuizBtn")
+          .addEventListener("click", () => finishQuiz(id));
+      }
+
+      function finishQuiz(id) {
+        const questions = quizData[id];
+        if (!questions) return;
+        let correct = 0;
+        questions.forEach((item, index) => {
+          const sel = document.querySelector(`input[name="q${index}"]:checked`);
+          if (sel && Number(sel.value) === item.c) correct++;
+        });
+        alert(
+          `Kamu menjawab benar ${correct} dari ${questions.length} pertanyaan!`
+        );
+
+        // restore info view (show image/desc/start button) but keep popup open
+        const img = document.getElementById("popupImage");
+        const desc = document.getElementById("popupDesc");
+        const startBtn = document.getElementById("startQuiz");
+        const quizArea = document.getElementById("quizArea");
+
+        img.style.display = "block";
+        desc.style.display = "block";
+        startBtn.style.display = "block";
+        quizArea.style.display = "none";
+      }
+
+      // ========== helpers & animation ==========
+      function updateTrafficLights(delta) {
+        trafficLights.forEach((light) => {
+          light.timer += delta;
+          const redTime = 4,
+            greenTime = 4,
+            yellowTime = 2;
+          if (light.state === 0 && light.timer > redTime) {
+            light.state = 1;
+            light.timer = 0;
+          } else if (light.state === 1 && light.timer > greenTime) {
+            light.state = 2;
+            light.timer = 0;
+          } else if (light.state === 2 && light.timer > yellowTime) {
+            light.state = 0;
+            light.timer = 0;
+          }
+          light.red.material.emissive.setHex(0x000000);
+          light.yellow.material.emissive.setHex(0x000000);
+          light.green.material.emissive.setHex(0x000000);
+          if (light.state === 0) light.red.material.emissive.setHex(0xff0000);
+          if (light.state === 1) light.green.material.emissive.setHex(0x00ff00);
+          if (light.state === 2)
+            light.yellow.material.emissive.setHex(0xffcc00);
+        });
       }
 
       function onKeyDown(e) {
@@ -258,36 +810,37 @@
           case "KeyW":
             moveForward = true;
             break;
-          case "KeyS":
-            moveBackward = true;
-            break;
           case "KeyA":
             moveLeft = true;
+            break;
+          case "KeyS":
+            moveBackward = true;
             break;
           case "KeyD":
             moveRight = true;
             break;
           case "ShiftLeft":
+          case "ShiftRight":
             sprint = true;
             break;
         }
       }
-
       function onKeyUp(e) {
         switch (e.code) {
           case "KeyW":
             moveForward = false;
             break;
-          case "KeyS":
-            moveBackward = false;
-            break;
           case "KeyA":
             moveLeft = false;
+            break;
+          case "KeyS":
+            moveBackward = false;
             break;
           case "KeyD":
             moveRight = false;
             break;
           case "ShiftLeft":
+          case "ShiftRight":
             sprint = false;
             break;
         }
@@ -302,23 +855,21 @@
       function animate() {
         requestAnimationFrame(animate);
         const delta = clock.getDelta();
-
         velocity.x -= velocity.x * 10.0 * delta;
         velocity.z -= velocity.z * 10.0 * delta;
-
         direction.z = Number(moveForward) - Number(moveBackward);
         direction.x = Number(moveRight) - Number(moveLeft);
         direction.normalize();
-
         const speed = sprint ? 120.0 : 50.0;
         if (moveForward || moveBackward)
           velocity.z -= direction.z * speed * delta;
         if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
-
-        controls.moveRight(-velocity.x * delta);
-        controls.moveForward(-velocity.z * delta);
-        controls.getObject().position.y = 2;
-
+        if (controls) {
+          controls.moveRight(-velocity.x * delta);
+          controls.moveForward(-velocity.z * delta);
+          controls.getObject().position.y = 2;
+        }
+        updateTrafficLights(delta);
         renderer.render(scene, camera);
       }
     </script>
