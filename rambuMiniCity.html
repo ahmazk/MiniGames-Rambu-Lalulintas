@@ -22,7 +22,132 @@
         padding: 8px 12px;
         border-radius: 8px;
       }
+      #hud {
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.45);
+        color: white;
+        font-family: sans-serif;
+        font-size: 14px;
+        border-radius: 8px;
+        pointer-events: none;
+        z-index: 10;
+      }
+      #minimapContainer {
+        position: absolute;
+        top: 60px;          /* di bawah HUD skor */
+        right: 20px;
+        width: 160px;
+        height: 160px;
+        padding: 4px;
+        box-sizing: border-box;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 9;
+        pointer-events: none;  /* biar nggak ganggu klik */
+      }
 
+      #minimap {
+        width: 100%;
+        height: 100%;
+        display: block;
+        background: transparent
+      }
+
+      #missionBox {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #ffffff;
+        font-family: sans-serif;
+        font-size: 14px;
+        border-radius: 8px;
+        pointer-events: none;
+        z-index: 10;
+      }
+      #signChecklist {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #ffffff;
+        font-family: sans-serif;
+        font-size: 13px;
+        border-radius: 8px;
+        pointer-events: none;
+        z-index: 10;
+        max-width: 220px;
+      }
+
+      #signChecklist h4 {
+        margin: 0 0 4px 0;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      #signChecklist ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      #signChecklist li {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 2px;
+      }
+
+      #signChecklist li span.badge {
+        font-size: 11px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+
+
+      #crosshair {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 12px;
+        height: 12px;
+        margin-left: -6px;
+        margin-top: -6px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        box-sizing: border-box;
+        pointer-events: none;
+        z-index: 5;
+        opacity: 0.7;
+      }
+
+      #interactionHint {
+        position: fixed;
+        bottom: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 6px 12px;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        font-family: sans-serif;
+        font-size: 14px;
+        border-radius: 6px;
+        pointer-events: none;
+        z-index: 6;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      #interactionHint.visible {
+        opacity: 1;
+      }
       /* popup styles */
       #popupOverlay {
         display: none;
@@ -33,7 +158,9 @@
         z-index: 9998;
       }
       #signPopup {
+        /* AWALNYA HARUS BENAR-BENAR HILANG */
         display: none;
+
         position: fixed;
         top: 50%;
         left: 50%;
@@ -47,9 +174,21 @@
         box-shadow: 0 15px 40px rgba(0, 0, 0, 0.35);
         font-family: sans-serif;
         z-index: 9999;
-        display: flex;
+        /* JANGAN ADA display:flex DI SINI */
         gap: 25px;
         align-items: center;
+        animation: popupScale 0.18s ease-out;
+      }
+
+      @keyframes popupScale {
+        from {
+          transform: translate(-50%, -50%) scale(0.85);
+          opacity: 0;
+        }
+        to {
+          transform: translate(-50%, -50%) scale(1);
+          opacity: 1;
+        }
       }
       #signPopup img {
         width: 80%;
@@ -79,10 +218,6 @@
         font-size: 18px;
         cursor: pointer;
       }
-      #startQuizBtn {
-        background: #007bff;
-        color: white;
-      }
       #finishQuizBtn {
         background: green;
         color: white;
@@ -107,7 +242,30 @@
         >Gunakan <b>W A S D</b> untuk bergerak, <b>mouse</b> untuk melihat,
         tekan <b>Shift</b> untuk sprint</small
       >
+      <br />
+      <small>
+        Tekan <b>1</b>=Pagi, <b>2</b>=Siang, <b>3</b>=Senja, <b>4</b>=Malam, <b>N</b>=Auto
+      </small>
     </div>
+    <div id="hud">Skor: 0 / 0</div>
+    <div id="minimapContainer">
+      <canvas id="minimap"></canvas>
+    </div>
+    <div id="crosshair"></div>
+    <div id="interactionHint">
+      Dekati rambu dan klik untuk melihat rambu & kuis
+    </div>
+    <div id="missionBox">
+      Misi: Pelajari semua rambu (0/0)
+    </div>
+    <div id="signChecklist">
+      <h4>Progress Rambu</h4>
+      <ul>
+        <li>Loading...</li>
+      </ul>
+    </div>
+
+
 
     <!-- overlay + popup -->
     <div id="popupOverlay"></div>
@@ -139,7 +297,7 @@
         <!-- default image path from container as requested -->
         <img
           id="popupImage"
-          src="/mnt/data/Corona-response-pop-up-veriheal.jpg"
+          src="Rambu-Tanda-Parkir-.jpg"
           alt="Rambu"
         />
       </div>
@@ -183,6 +341,30 @@
       let trafficLights = [];
 
       let currentSignId = null;
+
+      // day-night cycle
+      let timeOfDay = 0.25;       // 0..1 (mulai dari "pagi")
+      let hemiLight, sunLight;    // lampu langit & matahari
+      let streetLamps = [];       // koleksi lampu jalan
+      let dayNightAuto = false;   // default: MATI (biar nggak random)
+      let minimapCanvas, minimapCtx;
+      const MINIMAP_SIZE = 160;        // piksel (harus sama dengan CSS)
+      const MINIMAP_WORLD_HALF = 100;  // world kira-kira dari -100..100
+
+
+
+
+      // daftar rambu (sekalian untuk misi)
+      const SIGN_IDS = ["parking", "schoolzone", "noparking", "speedlimit"];
+
+      // skor kuis
+      let signScores = {};          // menyimpan skor terbaik per rambu
+      let totalQuizQuestions = 0;   // jumlah semua soal
+
+      // status misi rambu (true = sudah dikuasai)
+      let signStates = {};
+      SIGN_IDS.forEach((id) => (signStates[id] = false));
+
 
       // quiz data
       const quizData = {
@@ -248,8 +430,105 @@
             c: 0,
           },
         ],
+        noparking: [
+          {
+            q: "Apa arti rambu dilarang parkir?",
+            a: [
+              "Kendaraan boleh parkir sebentar",
+              "Kendaraan tidak boleh parkir di area tersebut",
+              "Kendaraan tidak boleh lewat sama sekali",
+            ],
+            c: 1,
+          },
+          {
+            q: "Apa yang boleh dilakukan di area dilarang parkir?",
+            a: [
+              "Berhenti sebentar tanpa mengganggu lalu lintas",
+              "Memarkir kendaraan lama",
+              "Menutup seluruh badan jalan",
+            ],
+            c: 0,
+          },
+          {
+            q: "Tujuan utama rambu dilarang parkir adalah…",
+            a: [
+              "Mempercantik jalan",
+              "Menertibkan tempat parkir liar",
+              "Memberi tempat khusus pejalan kaki",
+            ],
+            c: 1,
+          },
+          {
+            q: "Apa yang bisa terjadi jika rambu ini diabaikan?",
+            a: [
+              "Lalu lintas menjadi lancar",
+              "Terjadi kemacetan dan mengganggu pengguna jalan lain",
+              "Tidak terjadi apa-apa",
+            ],
+            c: 1,
+          },
+          {
+            q: "Bentuk umum rambu dilarang parkir adalah…",
+            a: [
+              "Lingkaran merah dengan huruf P dicoret",
+              "Segitiga kuning",
+              "Kotak biru dengan huruf P",
+            ],
+            c: 0,
+          },
+        ],
+        speedlimit: [
+          {
+            q: "Apa fungsi rambu batas kecepatan?",
+            a: [
+              "Menyuruh pengendara mempercepat kendaraan",
+              "Membatasi kecepatan maksimal kendaraan",
+              "Menunjukkan jumlah kendaraan di jalan",
+            ],
+            c: 1,
+          },
+          {
+            q: "Jika tertulis angka 40 pada rambu batas kecepatan, artinya…",
+            a: [
+              "Kecepatan minimal 40 km/jam",
+              "Kecepatan maksimal 40 km/jam",
+              "Kecepatan harus selalu 40 km/jam",
+            ],
+            c: 1,
+          },
+          {
+            q: "Mengapa batas kecepatan penting?",
+            a: [
+              "Untuk menghemat bahan bakar",
+              "Untuk keselamatan pengguna jalan",
+              "Agar jalan tidak cepat rusak",
+            ],
+            c: 1,
+          },
+          {
+            q: "Apa yang sebaiknya dilakukan jika kondisi jalan ramai?",
+            a: [
+              "Tetap memacu kendaraan setinggi mungkin",
+              "Menjaga kecepatan di bawah atau sesuai batas",
+              "Berhenti di tengah jalan",
+            ],
+            c: 1,
+          },
+          {
+            q: "Di mana rambu batas kecepatan sering dipasang?",
+            a: [
+              "Di depan rumah saja",
+              "Di jalan tol dan jalan umum tertentu",
+              "Hanya di area parkir",
+            ],
+            c: 1,
+          },
+        ],
       };
 
+      Object.keys(quizData).forEach((id) => {
+        totalQuizQuestions += quizData[id].length;
+      });
       // ========== Init / Scene ==========
       init();
       animate();
@@ -270,23 +549,44 @@
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
+        // inisialisasi canvas minimap
+        minimapCanvas = document.getElementById("minimap");
+        if (minimapCanvas) {
+          minimapCanvas.width = MINIMAP_SIZE;
+          minimapCanvas.height = MINIMAP_SIZE;
+          minimapCtx = minimapCanvas.getContext("2d");
+        }
+
+        // pastikan popup & overlay benar-benar tersembunyi saat awal
+        const popup = document.getElementById("signPopup");
+        const overlay = document.getElementById("popupOverlay");
+        if (popup) popup.style.display = "none";
+        if (overlay) overlay.style.display = "none";
+
 
         // register click for pointer lock (first click) - keep simple
         document.body.addEventListener("click", () => {
+          const popup = document.getElementById("signPopup");
+          // kalau popup lagi tampil, jangan lock pointer
+          if (popup && popup.style.display === "flex") return;
+
           if (!controls.isLocked) controls.lock();
         });
+
 
         // register click for interactions (this handler WILL check isLocked)
         document.addEventListener("click", handleSceneClick, false);
 
         // lights
-        const hemi = new THREE.HemisphereLight(0xffffff, 0x88bbff, 0.6);
-        scene.add(hemi);
-        const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-        dir.position.set(50, 60, -30);
-        dir.castShadow = true;
-        dir.shadow.mapSize.width = dir.shadow.mapSize.height = 2048;
-        scene.add(dir);
+                // lights (global, supaya bisa diubah untuk day-night cycle)
+        hemiLight = new THREE.HemisphereLight(0xffffff, 0x88bbff, 0.7);
+        scene.add(hemiLight);
+
+        sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        sunLight.position.set(50, 60, -30);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = sunLight.shadow.mapSize.height = 2048;
+        scene.add(sunLight);
 
         // ground
         const ground = new THREE.Mesh(
@@ -376,16 +676,20 @@
           );
         }
         function isTooCloseToRoad(x, z) {
-          if (Math.abs(z) < roadWidth / 2 + 2) return true;
-          if (Math.abs(x) < roadWidth / 2 + 2) return true;
+          const margin = 5; // jarak aman dari tepi jalan
+
+          if (Math.abs(z) < roadWidth / 2 + margin) return true;
+          if (Math.abs(x) < roadWidth / 2 + margin) return true;
+
           for (let i = -100; i <= 100; i += gridSpacing) {
-            if (Math.abs(x - i) < roadWidth / 2 + 2 && Math.abs(z) < 150)
+            if (Math.abs(x - i) < roadWidth / 2 + margin && Math.abs(z) < 150)
               return true;
-            if (Math.abs(z - i) < roadWidth / 2 + 2 && Math.abs(x) < 150)
+            if (Math.abs(z - i) < roadWidth / 2 + margin && Math.abs(x) < 150)
               return true;
           }
           return false;
         }
+
         for (let i = -100; i <= 100; i += gridSpacing) {
           for (let z = -maxRange; z <= maxRange; z += treeSpacing) {
             const leftX = i - roadWidth / 2 - offsetFromRoad;
@@ -463,7 +767,7 @@
               new THREE.MeshStandardMaterial({ color: 0x333333 })
             );
             pole.position.set(0, 2, 0);
-            board.position.set(0, 3.2, 0);
+            board.position.set(0, 3.2, 0.06);
             const sign = new THREE.Group();
             sign.add(pole, board);
             sign.position.set(52, 0, -40);
@@ -488,7 +792,7 @@
             new THREE.BoxGeometry(1.5, 2, 0.1),
             new THREE.MeshStandardMaterial({ color: 0x2e8b57 })
           );
-          board.position.set(0, 4.2, 0); // FIXED -> 4.2 (previously 42)
+          board.position.set(0, 4.2, 0.03); // FIXED -> 4.2 (previously 42)
           const signGroup = new THREE.Group();
           signGroup.add(pole, board);
           signGroup.position.set(x, y, z);
@@ -496,6 +800,81 @@
           scene.add(signGroup);
           clickableSigns.push({ mesh: signGroup, id: "parking" });
         }
+                // no-parking sign (simple box version)
+        function createNoParkingSign(x, y, z, rotationY) {
+          const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.06, 0.06, 4, 12),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
+          );
+          pole.position.set(0, 2, 0);
+
+          const board = new THREE.Mesh(
+            new THREE.CircleGeometry(1.1, 32),
+            new THREE.MeshStandardMaterial({
+              color: 0xffffff,
+              side: THREE.DoubleSide,
+            })
+          );
+          board.position.set(0, 4.2, 0.03);
+
+          const redBorder = new THREE.Mesh(
+            new THREE.RingGeometry(0.9, 1.1, 32),
+            new THREE.MeshStandardMaterial({
+              color: 0xff0000,
+              side: THREE.DoubleSide,
+            })
+          );
+          redBorder.position.set(0, 4.2, 0.04);
+
+          const slash = new THREE.Mesh(
+            new THREE.BoxGeometry(1.6, 0.18, 0.05),
+            new THREE.MeshStandardMaterial({ color: 0xff0000 })
+          );
+          slash.position.set(0, 4.2, 0.05);
+          slash.rotation.z = Math.PI / 4;
+
+        const group = new THREE.Group();
+        group.add(pole, board, redBorder, slash);
+
+        // --- Tambah huruf "P" di tengah rambu ---
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 512;
+        const ctx = canvas.getContext("2d");
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "black";
+        ctx.font = "bold 500px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("P", canvas.width / 2, canvas.height / 2);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const textMat = new THREE.MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+          side: THREE.DoubleSide,
+        });
+
+        const textPlane = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.4, 1.4),
+          textMat
+        );
+        // posisinya sedikit di depan papan lingkaran
+        textPlane.position.set(0, 4.2, 0.07);
+        group.add(textPlane);
+        // --- akhir tambah "P" ---
+
+        group.position.set(x, y, z);
+        group.rotation.y = rotationY;
+        scene.add(group);
+
+        clickableSigns.push({ mesh: group, id: "noparking" });
+
+        }
+
+        // tempatkan rambu dilarang parkir di area lain kota
+        createNoParkingSign(-30, 0, -27, -Math.PI / 2);
+
 
         // traffic lights back-only (kept)
         function createTrafficLight(x, z) {
@@ -610,6 +989,53 @@
           stripe.position.set(i, 0.03, -30);
           scene.add(stripe);
         }
+        // street lamps (akan menyala otomatis saat malam)
+        function createStreetLamp(x, z, rotationY = 0) {
+          const lampGroup = new THREE.Group();
+
+          const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.08, 0.08, 5, 12),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
+          );
+          pole.position.set(0, 2.5, 0);
+          lampGroup.add(pole);
+
+          const arm = new THREE.Mesh(
+            new THREE.BoxGeometry(2, 0.12, 0.12),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
+          );
+          arm.position.set(1, 4.3, 0);
+          lampGroup.add(arm);
+
+          const bulb = new THREE.Mesh(
+            new THREE.SphereGeometry(0.25, 12, 12),
+            new THREE.MeshStandardMaterial({
+              color: 0xffffcc,
+              emissive: 0x000000,
+            })
+          );
+          bulb.position.set(2, 4.1, 0);
+          lampGroup.add(bulb);
+
+          const light = new THREE.PointLight(0xffffcc, 0, 18, 2.0);
+          light.position.set(2, 4.1, 0);
+          lampGroup.add(light);
+
+          lampGroup.position.set(x, 0, z);
+          lampGroup.rotation.y = rotationY;
+          scene.add(lampGroup);
+
+          streetLamps.push({ group: lampGroup, light, bulb });
+        }
+
+        // letakkan beberapa lampu di sekitar zebra cross & jalan
+        // kira-kira "trotoar" samping jalan
+        createStreetLamp(13, -38, 0);  // sejajar traffic light kiri
+        createStreetLamp(27, -38, 0);  // sejajar traffic light kanan   
+        createStreetLamp(-9, 27, Math.PI);
+        createStreetLamp(36, -44, Math.PI / 2);
+
+
 
         // pointer lock controls
         controls = new THREE.PointerLockControls(camera, document.body);
@@ -629,7 +1055,75 @@
         document.getElementById("startQuiz").addEventListener("click", () => {
           if (currentSignId) startQuiz(currentSignId);
         });
+        updateHud();
+        updateMissionBox();
+        updateSignChecklist();
       }
+              // speed limit 40 sign (simple) 
+        function createSpeedLimitSign(x, y, z, rotationY) {
+          const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.06, 0.06, 3.5, 12),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
+          );
+          pole.position.set(0, 1.75, 0);
+
+          const board = new THREE.Mesh(
+            new THREE.CircleGeometry(1.2, 32),
+            new THREE.MeshStandardMaterial({
+              color: 0xffffff,
+              side: THREE.DoubleSide,   // <— penting
+            })            
+          );
+          board.position.set(0, 3.5, 0.05);
+
+          const border = new THREE.Mesh(
+            new THREE.RingGeometry(1.0, 1.2, 32),
+            new THREE.MeshStandardMaterial({
+              color: 0xff0000,
+              side: THREE.DoubleSide,   // <— penting
+            })
+          );
+          border.position.set(0, 3.5, 0.06);
+
+          const group = new THREE.Group();
+          group.add(pole, board, border);
+          group.position.set(x, y, z);
+          group.rotation.y = rotationY;
+          scene.add(group);
+
+          clickableSigns.push({ mesh: group, id: "speedlimit" });
+
+          // opsional: teks "40" di tengah (menggunakan Sprite sederhana)
+          // teks "40" di tengah (plane transparan, bukan sprite billboard)
+          const canvas = document.createElement("canvas");
+          canvas.width = canvas.height = 256;
+          const ctx = canvas.getContext("2d");
+
+          // background transparan
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          ctx.fillStyle = "black";
+          ctx.font = "bold 160px Arial";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("40", canvas.width / 2, canvas.height / 2);
+
+          const texture = new THREE.CanvasTexture(canvas);
+          const textMat = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            side: THREE.DoubleSide,     // <— biar kelihatan dari depan & belakang
+          });
+
+          const textPlane = new THREE.Mesh(
+            new THREE.PlaneGeometry(1.4, 1.4),
+            textMat
+          );
+          textPlane.position.set(0, 3.5, 0.09);
+          group.add(textPlane);
+        }
+
+        createSpeedLimitSign(-8, 0, 40, 0);
 
       // ========== Interaction handlers ==========
       function handleSceneClick(event) {
@@ -684,24 +1178,34 @@
           title.innerText = "Rambu Parkir (P)";
           desc.innerText =
             "Rambu ini menandakan area yang diperbolehkan untuk parkir kendaraan. Pengendara boleh berhenti dan memarkirkan kendaraannya di area ini.";
-          img.src = "/mnt/data/Corona-response-pop-up-veriheal.jpg";
+          img.src = "Rambu-Tanda-Parkir-.jpg";
         } else if (id === "schoolzone") {
           title.innerText = "Rambu School Zone";
           desc.innerText =
             "Rambu ini menandakan bahwa Anda memasuki area sekolah. Pengendara wajib memperlambat kendaraan dan lebih waspada terhadap siswa yang melintas.";
-          img.src = "/mnt/data/59863e0e-fbd0-4775-bdae-786d0798db0e.png";
+          img.src = "images.png";
+        } else if (id === "noparking") {
+          title.innerText = "Rambu Dilarang Parkir";
+          desc.innerText =
+            "Rambu ini menunjukkan bahwa kendaraan tidak boleh diparkir di area tersebut untuk menjaga kelancaran lalu lintas.";
+          img.src = "Rambu-Tanda-Parkir-.jpg"; // boleh pakai gambar sama dulu
+        } else if (id === "speedlimit") {
+          title.innerText = "Rambu Batas Kecepatan 40";
+          desc.innerText =
+            "Rambu ini menginformasikan batas kecepatan maksimum yang diperbolehkan adalah 40 km/jam di ruas jalan tersebut.";
+          img.src = "Rambu-Tanda-Parkir-.jpg"; // bisa diganti jika punya gambar khusus
         } else {
           title.innerText = "Rambu";
           desc.innerText = "Informasi rambu tidak tersedia.";
-          img.src = "/mnt/data/Corona-response-pop-up-veriheal.jpg";
+          img.src = "Rambu-Tanda-Parkir-.jpg";
         }
 
-        // show overlay + popup; unlock pointer so user can use mouse & buttons
+
+        // show overlay + popup; unlock pointer supaya bisa klik
         overlay.style.display = "block";
         popup.style.display = "flex";
         controls.unlock();
       }
-
       function hidePopup() {
         const popup = document.getElementById("signPopup");
         const overlay = document.getElementById("popupOverlay");
@@ -753,32 +1257,364 @@
           .getElementById("finishQuizBtn")
           .addEventListener("click", () => finishQuiz(id));
       }
-
       function finishQuiz(id) {
         const questions = quizData[id];
         if (!questions) return;
+
+        const quizArea = document.getElementById("quizArea");
+        if (!quizArea) return;
+
         let correct = 0;
+        const userAnswers = [];
+
+        // baca jawaban user
         questions.forEach((item, index) => {
           const sel = document.querySelector(`input[name="q${index}"]:checked`);
-          if (sel && Number(sel.value) === item.c) correct++;
+          const idx = sel ? Number(sel.value) : -1;   // -1 = tidak jawab
+          userAnswers.push(idx);
+          if (idx === item.c) correct++;
         });
-        alert(
-          `Kamu menjawab benar ${correct} dari ${questions.length} pertanyaan!`
-        );
 
-        // restore info view (show image/desc/start button) but keep popup open
-        const img = document.getElementById("popupImage");
-        const desc = document.getElementById("popupDesc");
-        const startBtn = document.getElementById("startQuiz");
-        const quizArea = document.getElementById("quizArea");
+        // ---- update skor & status rambu ----
+        const prev = signScores[id] || 0;
+        if (correct > prev) {
+          signScores[id] = correct;
+        }
 
-        img.style.display = "block";
-        desc.style.display = "block";
-        startBtn.style.display = "block";
-        quizArea.style.display = "none";
+        // tandai rambu "dikuasai" kalau semua soal benar
+        if (SIGN_IDS.includes(id)) {
+          signStates[id] = true;
+        }
+
+        updateHud();
+        updateMissionBox();
+        updateSignChecklist();   // <--- penting untuk checklist
+
+        // ---- bangun tampilan hasil kuis di dalam popup ----
+        let html = `
+          <h3 style="margin-top:0;">Hasil Kuis</h3>
+          <p style="margin-bottom:12px;">
+            Kamu menjawab benar <b>${correct}</b> dari <b>${questions.length}</b> pertanyaan.
+          </p>
+          <div style="max-height:260px; overflow:auto; margin-top:6px;">
+        `;
+
+        questions.forEach((item, index) => {
+          const u = userAnswers[index];
+          const benar = u === item.c;
+          const userText = u >= 0 ? item.a[u] : "(tidak menjawab)";
+          const correctText = item.a[item.c];
+
+          html += `
+            <div style="margin-bottom:8px; font-size:14px;">
+              <b>${index + 1}. ${item.q}</b><br>
+              <span style="color:${benar ? '#1e7e34' : '#c82333'};">
+                Jawabanmu: ${userText} ${benar ? "✅" : "❌"}
+              </span><br>
+          `;
+
+          if (!benar) {
+            html += `
+              <span style="color:#555;">
+                Jawaban yang benar: <b>${correctText}</b>
+              </span>
+            `;
+          }
+
+          html += `</div>`;
+        });
+
+        html += `
+          </div>
+          <button id="backInfoBtn"
+            class="btn"
+            style="background:#007bff; color:white; margin-top:14px;">
+            Kembali ke informasi rambu
+          </button>
+        `;
+
+        // taruh hasil ke quizArea
+        quizArea.innerHTML = html;
+        quizArea.style.display = "block";
+
+        // tetap sembunyikan image + deskripsi + tombol "Mulai Kuis"
+        document.getElementById("popupImage").style.display = "none";
+        document.getElementById("popupDesc").style.display = "none";
+        document.getElementById("startQuiz").style.display = "none";
+
+        // tombol untuk balik ke info rambu
+        document.getElementById("backInfoBtn").addEventListener("click", () => {
+          document.getElementById("popupImage").style.display = "block";
+          document.getElementById("popupDesc").style.display = "block";
+          document.getElementById("startQuiz").style.display = "block";
+          quizArea.style.display = "none";
+        });
       }
 
+      
       // ========== helpers & animation ==========
+      function updateHud() {
+        const hud = document.getElementById("hud");
+        if (!hud) return;
+
+        let totalBenar = 0;
+        Object.keys(signScores).forEach((id) => {
+          totalBenar += signScores[id];
+        });
+
+        hud.textContent = `Skor: ${totalBenar} / ${totalQuizQuestions}`;
+      }
+
+      function updateInteractionHint() {
+        const hint = document.getElementById("interactionHint");
+        if (!hint) return;
+
+        // hint hanya muncul saat pointer lock aktif
+        if (!controls || !controls.isLocked || clickableSigns.length === 0) {
+          hint.classList.remove("visible");
+          return;
+        }
+
+        // raycast dari tengah layar
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        const intersects = raycaster.intersectObjects(
+          clickableSigns.map((s) => s.mesh),
+          true
+        );
+        if (intersects.length === 0) {
+          hint.classList.remove("visible");
+          return;
+        }
+
+        const obj = intersects[0].object;
+        const found = findClickableSignFromObject(obj);
+        if (!found) {
+          hint.classList.remove("visible");
+          return;
+        }
+
+        const dist = camera.position.distanceTo(found.mesh.position);
+        if (dist < 12) {
+          hint.textContent = "Klik untuk melihat rambu & kuis";
+          hint.classList.add("visible");
+        } else {
+          hint.classList.remove("visible");
+        }
+      }
+
+      function updateMissionBox() {
+        const box = document.getElementById("missionBox");
+        if (!box) return;
+
+        let completed = 0;
+        SIGN_IDS.forEach((id) => {
+          if (signStates[id]) completed++;
+        });
+
+        box.textContent = `Misi: Pelajari semua rambu (${completed}/${SIGN_IDS.length})`;
+
+        if (completed === SIGN_IDS.length) {
+          box.textContent = "Misi: Semua rambu sudah dipelajari! ✅";
+        }
+      }
+      function updateSignChecklist() {
+        const panel = document.getElementById("signChecklist");
+        if (!panel) return;
+
+        const ul = panel.querySelector("ul");
+        if (!ul) return;
+
+        // mapping id -> nama rambu untuk ditampilkan
+        const labelMap = {
+          parking: "Rambu Parkir (P)",
+          schoolzone: "School Zone",
+          noparking: "Dilarang Parkir",
+          speedlimit: "Batas Kecepatan 40",
+        };
+
+        ul.innerHTML = "";
+
+        SIGN_IDS.forEach((id) => {
+          const li = document.createElement("li");
+
+          const done = !!signStates[id];
+          const icon = document.createElement("span");
+          icon.textContent = done ? "✅" : "⬜";
+          icon.style.minWidth = "18px";
+
+          const text = document.createElement("span");
+          text.textContent = labelMap[id] || id;
+
+          const badge = document.createElement("span");
+          badge.className = "badge";
+          badge.textContent = done ? "Selesai" : "Belum";
+
+          li.appendChild(icon);
+          li.appendChild(text);
+          li.appendChild(badge);
+
+          ul.appendChild(li);
+        });
+      }
+      function updateMinimap() {
+        if (!minimapCtx || !controls) return;
+
+        const ctx = minimapCtx;
+        ctx.clearRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
+
+        // background
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
+
+        const center = MINIMAP_SIZE / 2;
+        const playerPos = controls.getObject().position;
+        const scale = MINIMAP_SIZE / (MINIMAP_WORLD_HALF * 2);
+
+        // --- ambil arah pandang player (pakai vektor, bukan rotation.y langsung) ---
+        const dirVec = new THREE.Vector3();
+        controls.getDirection(dirVec);          // arah pandang kamera
+        const dirAngle = Math.atan2(dirVec.x, dirVec.z);   // sudut di bidang XZ (full 360°)
+
+        // ===== DUNIA DIPUTAR MENGELILINGI PLAYER =====
+        ctx.save();
+        ctx.translate(center, center);
+        ctx.rotate(-dirAngle);   // rotate dunia berlawanan arah pandang
+
+        // garis referensi
+        ctx.strokeStyle = "rgba(255,255,255,0.25)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, -center);
+        ctx.lineTo(0, center);
+        ctx.moveTo(-center, 0);
+        ctx.lineTo(center, 0);
+        ctx.stroke();
+
+        // titik rambu
+        clickableSigns.forEach((s) => {
+          if (!s.mesh || !s.mesh.position) return;
+
+          const dx = s.mesh.position.x - playerPos.x;
+          const dz = s.mesh.position.z - playerPos.z;
+
+          if (Math.abs(dx) > MINIMAP_WORLD_HALF || Math.abs(dz) > MINIMAP_WORLD_HALF) {
+            return;
+          }
+
+          const mx = dx * scale;
+          const mz = -dz * scale; // minus: depan = atas
+
+          if (s.id === "parking") ctx.fillStyle = "#00aaff";
+          else if (s.id === "schoolzone") ctx.fillStyle = "#ffd400";
+          else if (s.id === "noparking") ctx.fillStyle = "#ff4d4d";
+          else if (s.id === "speedlimit") ctx.fillStyle = "#ffffff";
+          else ctx.fillStyle = "#cccccc";
+
+          ctx.beginPath();
+          ctx.arc(mx, mz, 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        ctx.restore();
+        // ===== END DUNIA =====
+
+        // ===== PLAYER ARROW – SELALU MENGHADAP ATAS =====
+        ctx.save();
+        ctx.translate(center, center);
+        const size = 6;
+        ctx.fillStyle = "#00ff00";
+        ctx.beginPath();
+        ctx.moveTo(0, -size);
+        ctx.lineTo(size * 0.6, size);
+        ctx.lineTo(-size * 0.6, size);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+
+
+      function updateDayNight(delta) {
+        if (!hemiLight || !sunLight) return;
+
+        // percepatan waktu (semakin besar = siklus makin cepat)
+        const cycleSpeed = 0.005; // lebih pelan
+
+        // hanya gerak kalau mode AUTO
+        if (dayNightAuto) {
+          timeOfDay = (timeOfDay + delta * cycleSpeed) % 1;
+        }
+        // konversi ke sudut matahari
+        const angle = timeOfDay * Math.PI * 2; // 0..2π
+        const sunHeight = Math.sin(angle);     // >0 = di atas horizon
+
+        // posisi matahari bergerak dalam lingkaran
+        const radius = 80;
+        sunLight.position.set(
+          Math.cos(angle) * radius,
+          Math.max(10, sunHeight * 80), // jangan terlalu negatif
+          -30
+        );
+
+        // faktor siang & malam
+        const dayFactor = Math.max(0, sunHeight); // 0..1
+        const nightFactor = 1 - dayFactor;
+
+        // intensitas cahaya
+        sunLight.intensity = 0.9 * dayFactor;
+        hemiLight.intensity = 0.2 + 0.6 * dayFactor;
+
+        // warna langit: biru siang -> jingga senja -> biru tua malam
+        const dayColor = new THREE.Color(0xaee6ff);
+        const sunsetColor = new THREE.Color(0xffc38b);
+        const nightColor = new THREE.Color(0x020924);
+
+        let skyColor;
+        if (dayFactor > 0.3) {
+          // dominan siang: interpolasi day -> sunset ringan
+          const t = 1 - (dayFactor - 0.3) / 0.7; // 1..0
+          skyColor = new THREE.Color().lerpColors(
+            dayColor,
+            sunsetColor,
+            Math.max(0, Math.min(1, t * 0.4))
+          );
+        } else {
+          // menjelang malam
+          const t = 1 - dayFactor / 0.3; // 0..1
+          skyColor = new THREE.Color().lerpColors(sunsetColor, nightColor, t);
+        }
+        scene.background = skyColor;
+
+        // lampu jalan menyala saat malam
+        streetLamps.forEach((lamp) => {
+          const intensity = 2.2 * nightFactor;
+          lamp.light.intensity = intensity;
+          lamp.bulb.material.emissive.setHex(
+            intensity > 0.2 ? 0xffffaa : 0x000000
+          );
+        });
+      }
+      function setTimeOfDayPreset(preset) {
+        // preset: "morning" | "noon" | "sunset" | "night"
+        switch (preset) {
+          case "morning":
+            timeOfDay = 0.20; // matahari agak rendah
+            break;
+          case "noon":
+            timeOfDay = 0.35; // paling terang
+            break;
+          case "sunset":
+            timeOfDay = 0.55; // jingga
+            break;
+          case "night":
+            timeOfDay = 0.80; // gelap
+            break;
+        }
+        // paksa update sekali supaya langsung kelihatan
+        updateDayNight(0);
+      }
+
+
       function updateTrafficLights(delta) {
         trafficLights.forEach((light) => {
           light.timer += delta;
@@ -823,8 +1659,31 @@
           case "ShiftRight":
             sprint = true;
             break;
+
+          // --- tambahan kontrol waktu ---
+          case "Digit1":
+            dayNightAuto = false;
+            setTimeOfDayPreset("morning");
+            break;
+          case "Digit2":
+            dayNightAuto = false;
+            setTimeOfDayPreset("noon");
+            break;
+          case "Digit3":
+            dayNightAuto = false;
+            setTimeOfDayPreset("sunset");
+            break;
+          case "Digit4":
+            dayNightAuto = false;
+            setTimeOfDayPreset("night");
+            break;
+          case "KeyN":
+            dayNightAuto = !dayNightAuto;
+            console.log("Day-night auto:", dayNightAuto);
+            break;
         }
       }
+
       function onKeyUp(e) {
         switch (e.code) {
           case "KeyW":
@@ -870,6 +1729,9 @@
           controls.getObject().position.y = 2;
         }
         updateTrafficLights(delta);
+        updateDayNight(delta);
+        updateInteractionHint();
+        updateMinimap();   
         renderer.render(scene, camera);
       }
     </script>
