@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Mini City 3D - First Person Explore</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.152.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <script>
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            var errorMsg = "Error: " + msg + "\nLine: " + lineNo + "\nFile: " + url;
+            alert(errorMsg);
+
+            var div = document.createElement("div");
+            div.style.position = "fixed";
+            div.style.top = "0";
+            div.style.left = "0";
+            div.style.background = "red";
+            div.style.color = "white";
+            div.style.padding = "20px";
+            div.style.zIndex = "10000";
+            div.innerText = errorMsg;
+            document.body.appendChild(div);
+        };
+
+        // Catch unhandled promise rejections (often from async imports)
+        window.addEventListener("unhandledrejection", function (event) {
+            alert("Unhandled Rejection: " + event.reason);
+        });
+    </script>
+    <div id="overlay">
+        Mini City - Jelajahi Kota (klik layar untuk mulai)<br />
+        <small>Gunakan <b>W A S D</b> untuk bergerak, <b>mouse</b> untuk melihat,
+            tekan <b>Shift</b> untuk sprint</small>
+        <br />
+        <small>
+            Tekan <b>1</b>=Pagi, <b>2</b>=Siang, <b>3</b>=Senja, <b>4</b>=Malam, <b>N</b>=Auto
+        </small>
+    </div>
+    <div id="hud">Skor: 0 / 0</div>
+    <div id="gameClock">00:00</div>
+    <div id="positionDisplay" style="
+        position: absolute;
+        top: 40px;
+        right: 20px;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.45);
+        color: white;
+        font-family: monospace;
+        font-size: 12px;
+        border-radius: 8px;
+        pointer-events: none;
+        z-index: 10;
+    ">
+        X: 0.00 | Y: 0.00 | Z: 0.00
+    </div>
+    <div id="minimapContainer">
+        <canvas id="minimap"></canvas>
+    </div>
+    <div id="crosshair"></div>
+    <div id="interactionHint">
+        Dekati rambu dan klik untuk melihat rambu & kuis
+    </div>
+    <div id="missionBox">
+        Misi: Pelajari semua rambu (0/0)
+    </div>
+    <div id="signChecklist">
+        <h4>Progress Rambu</h4>
+        <ul>
+            <li>Loading...</li>
+        </ul>
+    </div>
+
+    <!-- Overlay + Popup -->
+    <div id="popupOverlay"></div>
+
+    <div id="signPopup" role="dialog" aria-modal="true">
+        <button id="closePopup" style="
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          background: transparent;
+          border: none;
+          font-size: 28px;
+          cursor: pointer;
+        ">
+            &times;
+        </button>
+
+        <div style="
+          flex: 1;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        ">
+            <img id="popupImage" src="images/rambu_parking.png" alt="Rambu" />
+        </div>
+
+        <div class="right">
+            <h2 id="popupTitle">Judul</h2>
+            <p id="popupDesc">Deskripsi</p>
+
+            <button id="startQuiz" class="btn" style="background: #007bff; color: white">
+                Mulai Kuis
+            </button>
+
+            <div id="quizArea" style="display: none; margin-top: 20px"></div>
+        </div>
+    </div>
+
+    <!-- Main Application Script -->
+    <script type="module" src="js/main.js"></script>
+</body>
+
+</html>
